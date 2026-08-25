@@ -1,0 +1,26 @@
+customers:
+  - external_key: acme-d2c
+    display_name: Acme D2C
+    reporting_timezone: America/New_York
+    reporting_currency: USD
+    refresh_cadence: daily
+    ad_accounts:
+      - platform: google_ads
+        platform_account_id: "1112223330"
+        account_timezone: Asia/Kolkata
+        account_currency: INR
+
+  - external_key: glow-cosmetics
+    display_name: Glow Cosmetics
+    reporting_timezone: Europe/London
+    reporting_currency: GBP
+    refresh_cadence: hourly
+    ad_accounts:
+      - platform: google_ads
+        platform_account_id: "2223334440"
+        account_timezone: America/Los_Angeles
+        account_currency: USD
+      - platform: google_ads
+        platform_account_id: "2223334441"
+        account_timezone: America/Los_Angeles
+        account_currency: USD

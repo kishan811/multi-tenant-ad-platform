@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ad Platform Pipeline — Design Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --bg-card: #ffffff;
+    --bg-code: #eef1f5;
+    --text: #1f2328;
+    --text-dim: #5f6b7a;
+    --primary: #1a73e8;
+    --primary-dim: #e8f0fe;
+    --border: #e1e6ec;
+    --tag-why: #0f9d58;
+    --tag-why-bg: #e6f4ea;
+    --tag-bug: #d93025;
+    --tag-bug-bg: #fce8e6;
+    --tag-impl: #1a73e8;
+    --tag-impl-bg: #e8f0fe;
+    --tag-next: #9334e6;
+    --tag-next-bg: #f3e8fd;
+    --shadow-1: 0 1px 2px rgba(60,64,67,0.12), 0 1px 3px rgba(60,64,67,0.08);
+    --shadow-2: 0 2px 6px rgba(60,64,67,0.15), 0 1px 2px rgba(60,64,67,0.10);
+  }
+  /* Always light: this page intentionally does not follow the OS/browser
+     dark-mode preference, so it reads the same for every viewer. */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  header.page-header {
+    margin-bottom: 32px;
+  }
+  header.page-header h1 {
+    font-size: 2.1rem;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  header.page-header p.subtitle {
+    color: var(--text-dim);
+    font-size: 1.08rem;
+    margin: 0;
+  }
+  .meta-line {
+    margin-top: 18px;
+    font-size: 0.85rem;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .meta-line span {
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-weight: 500;
+    border-radius: 999px;
+    padding: 5px 14px;
+  }
+  nav.toc {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 36px;
+    box-shadow: var(--shadow-1);
+  }
+  nav.toc h2 {
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+  }
+  nav.toc ol {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: 32px;
+    counter-reset: toc-counter;
+  }
+  nav.toc li {
+    margin-bottom: 10px;
+    break-inside: avoid;
+    counter-increment: toc-counter;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  nav.toc li::before {
+    content: counter(toc-counter);
+    color: #fff;
+    background: var(--primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  nav.toc a { color: var(--text); text-decoration: none; font-weight: 500; }
+  nav.toc a:hover { color: var(--primary); }
+
+  section.point {
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 30px 32px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-1);
+    transition: box-shadow 0.15s ease;
+  }
+  section.point h2 {
+    margin-top: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section.point h2 .num {
+    color: #fff;
+    background: var(--primary);
+    font-weight: 700;
+    font-size: 0.9rem;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .assignment-ask {
+    font-style: italic;
+    color: var(--text-dim);
+    background: var(--bg-code);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 0 0 20px;
+    font-size: 0.93rem;
+  }
+  .block {
+    margin: 18px 0;
+  }
+  .block h3 {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin: 0 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+  }
+  .block.chose h3 { color: var(--tag-impl); background: var(--tag-impl-bg); }
+  .block.why h3 { color: var(--tag-why); background: var(--tag-why-bg); }
+  .block p { margin: 0; }
+  .block ul, .block ol { margin: 8px 0 0; padding-left: 1.3em; }
+  .block li { margin-bottom: 6px; }
+  code {
+    background: var(--bg-code);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.88em;
+    font-family: "Roboto Mono", Consolas, "Courier New", monospace;
+  }
+  pre {
+    background: var(--bg-code);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    font-family: "Roboto Mono", Consolas, monospace;
+  }
+  pre code { background: none; padding: 0; }
+  a.file-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px solid transparent;
+  }
+  a.file-link:hover { border-bottom-color: var(--primary); }
+
+  section.plain {
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 30px 32px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-1);
+  }
+  section.plain h2 {
+    margin-top: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+  }
+
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .step-card {
+    background: var(--tag-next-bg);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .step-card .step-title {
+    font-weight: 700;
+    color: var(--tag-next);
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+  .step-card p { margin: 0; font-size: 0.9rem; color: var(--text); }
+
+  .bug {
+    border-radius: 10px;
+    border-left: 4px solid var(--tag-bug);
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    background: var(--tag-bug-bg);
+  }
+  .bug:last-child { margin-bottom: 0; }
+  .bug .bug-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+  }
+  .bug .bug-title .badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--tag-bug);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .bug p { margin: 6px 0; font-size: 0.95rem; }
+  .bug .found-by { color: var(--text-dim); font-size: 0.85rem; margin-top: 10px; }
+
+  footer.page-footer {
+    margin-top: 40px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
+  .tabbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 10px 4px 12px;
+    margin-right: 20px;
+    cursor: pointer;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .impl-note {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin: 0 0 18px;
+  }
+  .cmd-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 10px 0;
+  }
+  @media (max-width: 640px) {
+    .cmd-pair { grid-template-columns: 1fr; }
+  }
+  .cmd-pair .cmd-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .cmd-pair pre { margin: 0; }
+  .expect {
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    margin: 8px 0 0;
+  }
+  .step-block {
+    margin: 20px 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .step-block:first-of-type { border-top: none; padding-top: 0; }
+  .step-block h4 { margin: 0 0 8px; font-size: 1rem; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-header">
+    <h1>Multi-Tenant Ad Platform Pipeline</h1>
+    <p class="subtitle">Design walkthrough: every point the assignment asked for, what I chose, and why.</p>
+    <div class="meta-line">
+      <span>Implemented platform: Google Ads</span>
+      <span>Orchestrator: Airflow</span>
+      <span>30 unit tests + 1 live-Postgres integration test</span>
+    </div>
+  </header>
+
+  <div class="tabbar" role="tablist">
+    <button type="button" class="tab-btn active" data-tab="design" role="tab" aria-selected="true">Design Document</button>
+    <button type="button" class="tab-btn" data-tab="implementation" role="tab" aria-selected="false">Implementation</button>
+  </div>
+
+  <div id="tab-design" class="tab-panel active">
+
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#schema">Postgres schema</a></li>
+      <li><a href="#timezone">Timezone handling</a></li>
+      <li><a href="#currency">Currency handling</a></li>
+      <li><a href="#accuracy">Data accuracy</a></li>
+      <li><a href="#operations">Operations</a></li>
+      <li><a href="#cost">Cost</a></li>
+      <li><a href="#implementation-choices">Implementation choices</a></li>
+      <li><a href="#next-steps">Next steps</a></li>
+      <li><a href="#ml-extension">ML extension / future use cases</a></li>
+      <li><a href="#bugs">Bugs found while building this</a></li>
+    </ol>
+  </nav>
+
+  <section class="point" id="architecture">
+    <h2><span class="num">1</span> Architecture</h2>
+    <p class="assignment-ask">"Orchestration choice, extraction workers, how three connectors share ~70% of logic but differ in API quirks."</p>
+
+    <div class="block chose"><h3>What I chose</h3>
+      <p><strong>Airflow</strong> as the orchestrator. One DAG per platform, with a single <strong>dynamically task-mapped</strong> extraction task (<code>extract.expand(ad_account=...)</code>) instead of one DAG per account. Each mapped task instance runs as an isolated pod (<code>KubernetesPodOperator</code>), does <em>extract → normalize → tz-bucket → currency-convert → idempotent upsert</em>, and writes its own <code>extraction_run</code> ledger row.</p>
+    </div>
+
+    <div class="block why"><h3>Why</h3>
+      <ul>
+        <li>Airflow is the orchestrator most data platform teams already run — the operational surface (retries, SLAs, backfill via dagrun re-runs) is well understood by whoever ends up on-call. I'd have picked Dagster's partitioned-asset model if this needed asset-level backfill as a first-class primitive, but it doesn't need to — <strong>correctness lives in the database's unique constraint, not the orchestrator</strong>. That's deliberate: the pipeline behaves identically whether it's run from Airflow, cron, or a laptop shell (exactly how this repo's own <code>cli.py</code> runs it).</li>
+        <li>Dynamic task mapping avoids a 7,500-DAG folder at 1,000 customers × ~2.5 accounts × 3 platforms — the DAG discovers active accounts from <code>dim_ad_account</code> at run time.</li>
+        <li>One task per <code>(platform, ad_account)</code> matches the platforms' own rate-limit granularity (per-account, not per-API-key) — a task's blast radius on a 429/<code>RESOURCE_EXHAUSTED</code> is exactly one account.</li>
+        <li><a class="file-link" href="dags/google_ads_daily.py">dags/google_ads_daily.py</a> makes this concrete rather than only descriptive — real TaskFlow/dynamic-task-mapping syntax calling the exact same <code>run_customer_extraction()</code> that <code>cli.py</code> uses. It's illustrative, not run against a live Airflow scheduler (that needs real Airflow Connections and Pools, out of scope here) — see the Implementation tab's assumptions for that caveat spelled out.</li>
+      </ul>
+    </div>
+
+    <div class="block chose"><h3>How the 70% shared logic actually works</h3>
+      <p>Implemented in <a class="file-link" href="src/adpipeline/base_connector.py">base_connector.py</a>. The shared base class owns pagination draining, retry/backoff with jitter, per-account rate-limiting, and auth-error classification. Each platform subclass implements exactly two methods: <code>fetch_page()</code> (the wire call) and <code>parse_rows()</code> (field mapping into the shared <code>RawCampaignDayMetric</code> contract). Adding Meta or TikTok next is a new subclass, not a rewrite of the pipeline.</p>
+    </div>
+
+    <div class="block why"><h3>Google Ads' specific quirks (vs. Meta, for contrast)</h3>
+      <ul>
+        <li><strong>Cost is in micros</strong> (<code>metrics.costMicros</code>, an integer string — 1,000,000 micros = 1 currency unit) instead of Meta's decimal string (<code>"1450.75"</code>). Less locale ambiguity, but get the micros-to-cents divisor wrong and every number is off by orders of magnitude.</li>
+        <li><strong>No platform-supplied finality flag.</strong> Meta tells you <code>date_stop_is_final</code>; Google Ads just silently revises <code>metrics.conversions</code> on re-query. Finality has to be inferred purely from row age (see <a href="#accuracy">Section 5</a>).</li>
+        <li><strong>Rate limiting gives no retry-after hint</strong> (<code>RESOURCE_EXHAUSTED</code>, no header) — the connector falls back to blind exponential backoff, unlike Meta's 613 error which at least suggests a wait time.</li>
+        <li><strong>Pagination via <code>nextPageToken</code></strong> in the response body, requiring the same GAQL query resent with a page token — a different shape than Meta's cursor object, same draining loop underneath.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="point" id="schema">
+    <h2><span class="num">2</span> Postgres schema</h2>
+    <p class="assignment-ask">"Staging, fact, dimension tables; partitioning, indexing, retention; sample query for yesterday's spend in USD for customer X."</p>
+
+    <div class="block chose"><h3>What I chose</h3>
+      <p>Full DDL in <a class="file-link" href="migrations/001_init.sql">migrations/001_init.sql</a>. <code>dim_customer</code> / <code>dim_ad_account</code> / <code>dim_campaign</code> / <code>dim_fx_rate</code> as dimensions; <code>stg_campaign_daily</code> (append-only, monthly-partitioned, holds raw JSONB payloads) as the audit trail; <code>fact_campaign_performance</code> (monthly-partitioned on <code>reporting_day</code>) as the query surface, unique-keyed on <code>(ad_account_id, campaign_sk, reporting_day)</code>.</p>
+    </div>
+
+    <div class="block why"><h3>Why this grain, why monthly partitions</h3>
+      <ul>
+        <li>The unique key on the fact table <em>is</em> the idempotency contract (Section 5) — it's not just a query-performance decision, it's a correctness one.</li>
+        <li>At 1,000 customers the fact table is only ~4.5M rows/year — not large enough to strictly need partitioning for speed, but partitioning turns staging retention into <code>DROP PARTITION</code> instead of a slow <code>DELETE</code>, and keeps dashboard queries pruning cleanly regardless of how many years accumulate.</li>
+        <li>A partial index <code>WHERE NOT is_final</code> keeps the reconciliation job's "which rows still need a re-check" query cheap and targeted instead of a full-table scan.</li>
+      </ul>
+    </div>
+
+    <div class="block chose"><h3>Sample query</h3>
+      <pre><code>WITH cust AS (
+  SELECT customer_id, reporting_timezone
+  FROM ads.dim_customer WHERE external_key = 'acme-d2c'
+)
+SELECT f.reporting_day,
+       SUM(f.spend_minor_reporting) / 100.0 AS spend_usd,
+       BOOL_AND(f.is_final) AS all_rows_final
+FROM ads.fact_campaign_performance f
+JOIN cust c USING (customer_id)
+WHERE f.reporting_day = (now() AT TIME ZONE c.reporting_timezone)::date - 1
+  AND f.reporting_currency = 'USD'
+GROUP BY f.reporting_day;</code></pre>
+      <p style="margin-top:10px;">Note <code>all_rows_final</code> is deliberately surfaced — a dashboard should say "$12,430 (still finalizing)" rather than presenting attribution-incomplete numbers as final.</p>
+    </div>
+  </section>
+
+  <section class="point" id="timezone">
+    <h2><span class="num">3</span> Timezone handling</h2>
+    <p class="assignment-ask">"Trace a single click at 11pm IST through extraction to the customer's reporting day. US DST? Reporting timezone changes triggering backfill?"</p>
+
+    <div class="block chose"><h3>What I chose</h3>
+      <p>The platform (not us) buckets a click into an account-local calendar day <em>before</em> we ever call the API — we only ever see <code>report_date</code>, never a raw timestamp. <a class="file-link" href="src/adpipeline/timezone_utils.py">timezone_utils.account_day_to_reporting_day()</a> converts that account-local day into the customer's reporting day by anchoring at <strong>local noon of report_date</strong> and converting that representative instant across timezones.</p>
+    </div>
+
+    <div class="block why"><h3>Why noon-anchoring, and where it's an approximation</h3>
+      <ul>
+        <li>We literally cannot recover the click's exact instant from a daily aggregate — noon is the best single representative point for a whole day, and it's exact whenever <code>account_timezone == reporting_timezone</code> (the common case for most D2C accounts).</li>
+        <li>It <em>can</em> be off by a day for a click near the account's local midnight when account tz and reporting tz differ enough to cross a day boundary — I call this out explicitly rather than hiding it, and the fix (hourly-grain extraction for the hourly-refresh cohort) is scoped as a documented next step, not a silent gap.</li>
+        <li><strong>IANA tz names, never fixed UTC offsets</strong> — this is a one-line decision (<code>account_timezone: str</code>, not <code>utc_offset_minutes: int</code>) that eliminates DST bugs for free. Storing a fixed offset is the classic mistake that "works in testing" (run in a non-DST month) and silently misattributes a day every March/November in production.</li>
+      </ul>
+    </div>
+
+    <div class="block chose"><h3>Reporting timezone changes</h3>
+      <p>A change writes a row to <code>dim_customer_setting_history</code> (<code>backfill_status='pending'</code>) <em>before</em> updating the live config — the history row, not a config diff, is the source of truth that a backfill is owed. The backfill job re-runs the same pipeline with the new timezone and must explicitly supersede the old-bucketed rows for the affected range, since idempotent upsert alone doesn't handle a bucket <em>shift</em> (new key, not a collision) — this is the one place I had to add an explicit step beyond "just re-run it".</p>
+    </div>
+  </section>
+
+  <section class="point" id="currency">
+    <h2><span class="num">4</span> Currency handling</h2>
+    <p class="assignment-ask">"FX rate source and granularity; store source / reporting / both; historical FX restatements; customer switches EUR → USD."</p>
+
+    <div class="block chose"><h3>What I chose</h3>
+      <p>Daily-close FX rates stored per-currency against a <strong>USD pivot</strong> in <code>dim_fx_rate</code> — any pair converts as a cross-rate, so I store <em>n</em> rates instead of <em>n²</em> pairs. Every fact row stores <strong>both</strong> <code>spend_minor_source</code>/<code>source_currency</code> <em>and</em> <code>spend_minor_reporting</code>/<code>reporting_currency</code>, plus <code>fx_rate_used</code> and <code>fx_rate_date</code> for full audit. See <a class="file-link" href="src/adpipeline/currency.py">currency.py</a>.</p>
+    </div>
+
+    <div class="block why"><h3>Why both, not just one</h3>
+      <ul>
+        <li>Storing only the converted number makes reconciliation against the platform UI impossible without re-deriving the original from a rate that may since have been restated.</li>
+        <li>Storing only the source number pushes conversion into every query — slower, and a correctness hazard if two dashboards convert with different rates.</li>
+        <li>All monetary math is <strong>integer minor units</strong> end to end, rounded exactly once with <code>ROUND_HALF_EVEN</code> (banker's rounding) — naive "always round up" rounding compounds a small systematic bias across millions of rows; this is proven by a dedicated test, not just asserted in a comment.</li>
+      </ul>
+    </div>
+
+    <div class="block chose"><h3>Restatements &amp; EUR→USD switch</h3>
+      <p>Because <code>fx_rate_used</code> is captured at write time, a later restatement of <code>dim_fx_rate</code> does not silently retroactively change history — propagating it is an explicit, auditable backfill above a materiality threshold. A currency switch uses the exact same <code>dim_customer_setting_history</code> event mechanism as a timezone change, but is actually simpler: it's an <code>UPDATE</code> of <code>spend_minor_reporting</code> on existing rows using their <em>original</em> <code>fx_rate_date</code>, not a bucket-shift — no orphaned-row problem.</p>
+    </div>
+  </section>
+
+  <section class="point" id="accuracy">
+    <h2><span class="num">5</span> Data accuracy</h2>
+    <p class="assignment-ask">"Attribution windows revise data for 7–28 days; late-arriving data without re-pulling everything? Reconciliation against platform UI? Idempotency on worker crash?"</p>
+
+    <div class="block chose"><h3>What I chose</h3>
+      <p>A bounded rolling reconciliation window: every run re-pulls "yesterday" plus a trailing <code>N</code>-day window (<code>N = MAX_ATTRIBUTION_WINDOW_DAYS</code>, 30 for Google Ads here) for any account with rows not yet <code>is_final</code>. A partial index keeps that lookup cheap. Idempotency comes from a DB-level unique constraint plus <code>INSERT ... ON CONFLICT DO UPDATE</code> in one transaction per batch — see <a class="file-link" href="src/adpipeline/postgres_writer.py">postgres_writer.py</a>.</p>
+    </div>
+
+    <div class="block why"><h3>Why this, not a full re-pull</h3>
+      <ul>
+        <li>Spend/impressions are essentially final same-day; it's conversions that drift, so re-pulling <em>everything</em> on every run wastes API quota for no accuracy gain. A bounded window costs roughly constant work regardless of accumulated history.</li>
+        <li><strong>Google Ads gives no finality signal at all</strong> — <code>GoogleAdsConnector</code> always reports "no veto" and <code>is_final</code> is purely <code>days_old >= attribution_window_days</code>. This is a real, acknowledged accuracy trade-off (contrast Meta's explicit flag), and it's specifically tested in <a class="file-link" href="tests/test_pipeline.py">tests/test_pipeline.py</a> because getting the AND-combination wrong either breaks finality forever or defeats reconciliation entirely.</li>
+        <li>Idempotency by DB constraint + atomic upsert, never "check then insert" — that pattern races under concurrent workers. A worker crash mid-batch leaves the previous committed state untouched; re-running the whole batch is safe by construction.</li>
+      </ul>
+    </div>
+
+    <div class="block chose"><h3>Reconciliation against the platform UI</h3>
+      <p>Designed, not built for this take-home: a low-frequency scheduled sampler that re-pulls a small set of already-<code>is_final</code> rows and diffs them against stored values — a nonzero diff on a row believed final is itself the alert. Scoped out to keep implementation time on the core path and its tests (see <a href="#next-steps">Section 9</a>).</p>
+    </div>
+  </section>
+
+  <section class="point" id="operations">
+    <h2><span class="num">6</span> Operations</h2>
+    <p class="assignment-ask">"Per-account rate limits across 1000 customers; expired tokens; observability and alerting; an on-call walkthrough for 'yesterday's numbers look wrong.'"</p>
+
+    <div class="block chose"><h3>What I chose</h3>
+      <ul>
+        <li>Rate limits enforced per-account on every platform → task-per-account isolation is already rate-limit-isolated. Real risk at scale is thundering-herd, not per-account exhaustion — mitigated by jittered job start times plus a per-account token bucket as a second line of defense.</li>
+        <li>Expired/revoked credentials raise <code>AuthError</code>, a non-retryable exception class distinct from rate limits/transient errors (see <a class="file-link" href="src/adpipeline/base_connector.py">base_connector.py</a>) — the account is flagged and excluded from future extraction attempts until reconnected, rather than burning retry budget on a dead credential.</li>
+      </ul>
+    </div>
+
+    <div class="block why"><h3>On-call walkthrough: "yesterday's numbers look wrong"</h3>
+      <ol>
+        <li>Confirm "yesterday" means the same calendar day to the customer and to me, using their <code>reporting_timezone</code> — the Section 2 sample query is literally step one.</li>
+        <li>Check <code>is_final</code>. If false, this is very likely <em>not a bug</em> — the conversion-lag window hasn't closed. Most "wrong number" reports should resolve here, via customer communication, not an engineering fix.</li>
+        <li>If final and still disputed: replay <code>stg_campaign_daily.raw_payload</code> and compare against the platform's live UI. A live mismatch is a real gap (rare platform-side restatement outside the expected window).</li>
+        <li>If raw payload matches the platform but the fact row doesn't match the raw payload: bug in normalize/convert/upsert — <code>timezone_utils.py</code> / <code>currency.py</code> are pure functions specifically so they're trivial to re-run by hand against the disputed row during an incident.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="point" id="cost">
+    <h2><span class="num">7</span> Cost</h2>
+    <p class="assignment-ask">"API quotas, compute, Postgres growth; first place to cut cost at 1000 customers."</p>
+    <div class="block chose"><h3>What I chose / would cut first</h3>
+      <p>At 1,000 customers, API call volume (tens of thousands/day) and compute (a modest 20–50 concurrent task-slot pool) aren't the bottleneck — Postgres fact-table growth (~4.5M rows/year) is trivial for a managed instance too. The first real cost lever is <code>raw_payload JSONB</code> in staging: invaluable for on-call replay (Section 6 step 3 depends on it directly), but the largest storage line item relative to day-to-day value. I'd keep full retention for accounts with a recent dispute/anomaly flag and truncate more aggressively for clean-history accounts — targeted, not a blanket cut that sacrifices the exact debugging tool I rely on.</p>
+    </div>
+  </section>
+
+  <section class="point" id="implementation-choices">
+    <h2><span class="num">8</span> Implementation choices</h2>
+    <div class="block chose"><h3>Why Google Ads over Meta/TikTok as the implemented platform</h3>
+      <p>Google Ads has the most distinct set of quirks to demonstrate the "70% shared, 30% platform-specific" architecture cleanly: integer micros instead of decimal strings, zero platform-supplied finality signal instead of an explicit flag, and no rate-limit retry hint instead of one. Implementing this one first means the <em>hardest</em> version of each design question (finality inference, backoff with no hint) is already solved, and adding Meta/TikTok afterward is strictly easier, not harder.</p>
+    </div>
+    <div class="block why"><h3>What's real vs. mocked</h3>
+      <ul>
+        <li>The Google Ads API is fully mocked (<a class="file-link" href="src/adpipeline/mock_google_ads_api.py">mock_google_ads_api.py</a>) — pagination, rate limiting with no retry-after, expired/revoked auth, and conversion-lag maturation are all simulated deterministically, per the assignment's explicit allowance to avoid burning real credentials.</li>
+        <li>Everything downstream of the mock — timezone bucketing, currency conversion, idempotent upsert, the pipeline orchestration — runs against a <strong>real local Postgres</strong> (via <code>docker-compose.yml</code>), not just unit-tested against a double. See Section 11 for what that caught.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="plain" id="next-steps">
+    <h2><span class="num">9</span> Next steps</h2>
+    <p style="color:var(--text-dim); margin-top:-4px;">What I'd build next if this went from a take-home into a real sprint, roughly in priority order.</p>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-title">Reconciliation job</div>
+        <p>The sampler described in Section 5 is designed, not built. This is the thing standing between "the pipeline looks correct" and "we caught the one time a platform silently restated old data." Highest priority.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Meta &amp; TikTok connectors</div>
+        <p>Same <code>BaseConnector</code> contract, new <code>fetch_page()</code>/<code>parse_rows()</code> pair each. Should be a day of work, not a redesign — that's the whole point of Section 1's shared-logic split.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Hourly-grain extraction</div>
+        <p>For the <code>refresh_cadence = hourly</code> cohort, shrinks the timezone noon-anchoring approximation (Section 3) from up-to-a-day to up-to-an-hour.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Cold-storage tiering</div>
+        <p>Move <code>fact_campaign_performance</code> partitions older than ~13 months to cheaper storage, once actual growth data justifies it rather than a guess (Section 7).</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Customer-day rollup table</div>
+        <p>A pre-aggregated table at the customer/day grain (skipping campaign) if dashboard query latency ever becomes a measured problem — not worth building preemptively at current row counts.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-title">Real FX feed integration</div>
+        <p>Swap the hardcoded demo rate table for a daily pull from openexchangerates.org or the ECB reference rates into <code>dim_fx_rate</code> (Section 4).</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="point" id="ml-extension">
+    <h2><span class="num">10</span> ML extension / future use cases</h2>
+    <p class="assignment-ask">Not part of the assignment, but worth a quick note on where this could go next.</p>
+
+    <div class="block chose"><h3>Where this fits</h3>
+      <p>The fact table is clean enough — one trusted row per customer/platform/account/campaign/day, with an explicit <code>is_final</code> flag — to double as a feature store later, if forecasting or anomaly detection ever becomes a priority.</p>
+      <pre><code>Trusted campaign fact
+        ↓
+Feature engineering
+        ↓
+Customer/platform/day features
+        ↓
+Spend forecasting
+Budget anomaly detection
+Campaign performance prediction
+        ↓
+Model evaluation
+        ↓
+Production inference
+        ↓
+Monitoring / drift</code></pre>
+      <p>Example features, all derivable from columns already in the schema: 7-day spend, 28-day spend, spend growth rate, CTR, CPC, conversion rate, rolling conversion trend, platform mix, campaign age, day-of-week, seasonality, lagged spend/conversions.</p>
+    </div>
+
+    <div class="block why"><h3>One caveat worth flagging up front</h3>
+      <p>All feature calculations must be point-in-time correct to prevent data leakage, particularly because ad-platform attribution data can be revised after the initial reporting date — the same issue Section 5.1 covers for reporting, it just bites harder in a training set.</p>
+    </div>
+  </section>
+
+  <section class="plain" id="bugs">
+    <h2><span class="num">11</span> Bugs found while building this</h2>
+    <p style="color:var(--text-dim); margin-top:-4px;">All three were caught by actually running the pipeline against a live Postgres in Docker, not just by unit tests against fakes — which is the argument for doing that step at all.</p>
+
+    <div class="bug">
+      <div class="bug-title"><span class="badge">Schema</span> Partitioned table's primary key missing the partition column</div>
+      <p><code>ads.stg_campaign_daily</code> is <code>PARTITION BY RANGE (report_date)</code>, but its original <code>PRIMARY KEY (id)</code> didn't include <code>report_date</code>. Postgres rejects this outright: <em>"unique constraint on partitioned table must include all partitioning columns."</em></p>
+      <p><strong>Fix:</strong> <code>PRIMARY KEY (id, report_date)</code>.</p>
+      <p class="found-by">Found by: applying <code>migrations/001_init.sql</code> to a real Postgres container — the schema load failed outright, not a silent issue.</p>
+    </div>
+
+    <div class="bug">
+      <div class="bug-title"><span class="badge">SQL</span> <code>ON CONFLICT DO UPDATE</code> referenced a column name that doesn't exist</div>
+      <p>The upsert's <code>DO UPDATE SET last_extraction_run_id = EXCLUDED.run_id</code> was wrong — <code>EXCLUDED</code> is keyed by the table's actual column names, not by the Python parameter dict's key (<code>run_id</code>). The column is <code>last_extraction_run_id</code>, so it should read <code>EXCLUDED.last_extraction_run_id</code>.</p>
+      <p><strong>Fix:</strong> corrected the <code>EXCLUDED</code> reference in <code>postgres_writer.py</code>.</p>
+      <p class="found-by">Found by: running the CLI against real Postgres — <code>psycopg.errors.UndefinedColumn: column excluded.run_id does not exist</code>.</p>
+    </div>
+
+    <div class="bug">
+      <div class="bug-title"><span class="badge">Driver behavior</span> psycopg3's <code>with conn:</code> closes the connection, not just the transaction</div>
+      <p>Unlike psycopg2, using a psycopg3 <code>Connection</code> object directly as <code>with self.conn:</code> for transaction scoping also <strong>closes the physical connection</strong> on exit. The writer was reused across multiple customers in one CLI run — the first customer's upsert silently closed the connection, and the second customer's write failed with <code>OperationalError: the connection is closed</code>.</p>
+      <p><strong>Fix:</strong> use <code>with self.conn.transaction():</code> instead, which scopes just the transaction and leaves the connection open for reuse.</p>
+      <p class="found-by">Found by: running the CLI across two configured customers in one process — a single-customer test run wouldn't have caught this at all.</p>
+    </div>
+  </section>
+
+  </div>
+
+  <div id="tab-implementation" class="tab-panel">
+  <section class="point" id="impl-overview">
+    <h2><span class="num">1</span> Overview</h2>
+    <p>This is a Google Ads connector that pulls campaign-level daily metrics, normalizes them for timezone and currency, and writes them into Postgres idempotently. The reasoning behind the full multi-platform system — Meta, Google Ads, and TikTok, orchestrated on Airflow — is in the Design Document tab above.</p>
+    <p>I mocked the Google Ads API rather than hitting the real thing (<code>mock_google_ads_api.py</code>), since the assignment says that's fine. The mock simulates pagination (<code>nextPageToken</code>), per-account rate limiting (<code>RESOURCE_EXHAUSTED</code>, with no retry-after hint), expired/revoked OAuth credentials, and conversion-lag revisions on re-pull.</p>
+  </section>
+
+  <section class="point" id="impl-layout">
+    <h2><span class="num">2</span> Project layout</h2>
+    <pre><code>config/customers.yaml              demo customer/ad-account config (stands in for dim_customer/dim_ad_account)
+migrations/001_init.sql            full Postgres schema (staging, fact, dims, partitioning, indexes)
+dags/google_ads_daily.py           illustrative Airflow DAG (dynamic task mapping over accounts) -- see caveat below
+src/adpipeline/
+  config.py                        load + validate customer config (tz/currency validation)
+  timezone_utils.py                account-day -> customer reporting-day bucketing, DST helpers
+  currency.py                      minor-unit currency conversion via USD pivot, banker's rounding
+  models.py                        RawCampaignDayMetric — the shared connector output contract
+  base_connector.py                shared pagination/retry/backoff logic (~70% shared across platforms)
+  google_ads_connector.py          Google Ads-specific field mapping + error classification
+  mock_google_ads_api.py           fixture-driven fake of the Google Ads Search API
+  postgres_writer.py               idempotent upsert (INSERT ... ON CONFLICT DO UPDATE)
+  pipeline.py                      orchestrates one customer's extraction end to end
+  cli.py                           `python -m adpipeline.cli` entrypoint
+tests/                              unit tests (see "Running tests" below)
+docker-compose.yml                  local Postgres for the real DB run / integration test
+design-walkthrough.html             this page</code></pre>
+  </section>
+
+  <section class="point" id="impl-setup">
+    <h2><span class="num">3</span> Setup</h2>
+    <p>Needs Python 3.11+.</p>
+    <pre><code>cd ad-pipeline-takehome
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+pip install -e .</code></pre>
+  </section>
+
+  <section class="point" id="impl-run">
+    <h2><span class="num">4</span> Running the pipeline locally against a real Postgres</h2>
+    <pre><code>docker compose up -d postgres
+# wait a few seconds for the healthcheck, then confirm the schema loaded:
+docker compose logs postgres | grep "CREATE TABLE" | tail -5</code></pre>
+    <pre><code>export DATABASE_URL=postgresql://adpipeline:adpipeline@localhost:5433/adpipeline
+python -m adpipeline.cli --start 2026-08-15 --end 2026-08-15 --today 2026-08-16</code></pre>
+    <p><code>--today</code> overrides "now" so the mock's reporting-lag simulation and FX-rate lookup stay deterministic for a demo run — leave it off to use the real current date.</p>
+    <p>Take a look at what landed:</p>
+    <pre><code>docker exec -it $(docker compose ps -q postgres) psql -U adpipeline -d adpipeline -c "SELECT customer_id, ad_account_id, reporting_day, spend_minor_reporting, reporting_currency, conversions, is_final FROM ads.fact_campaign_performance ORDER BY reporting_day;"</code></pre>
+    <p>Run the same command again — the row count shouldn't move, that's the idempotent upsert doing its job. Run it again with a much later <code>--today</code> (say <code>--today 2026-09-20</code>, past the 30-day Google Ads conversion-lag window this pipeline uses) and you should see <code>conversions</code> and <code>is_final</code> update in place on the same rows, still with no new rows created.</p>
+    <p>Tear it down with <code>docker compose down -v</code> when you're done.</p>
+  </section>
+
+  <section class="point" id="impl-tests">
+    <h2><span class="num">5</span> Running tests</h2>
+    <pre><code>pytest -q</code></pre>
+    <p>31 unit tests, no external dependencies needed — timezone edge cases, currency conversion, idempotent upserts against an in-memory Postgres-semantics double, the pipeline's finality logic, and API error handling (rate limits with no retry-after hint, retries, pagination, expired/revoked OAuth credentials, conversion-lag maturity).</p>
+    <p>There's one more test that's skipped unless a live Postgres is actually running:</p>
+    <pre><code>docker compose up -d postgres
+export DATABASE_URL=postgresql://adpipeline:adpipeline@localhost:5433/adpipeline
+pytest -q tests/test_idempotency_integration.py</code></pre>
+    <p>It re-checks the same idempotency assertion as <code>tests/test_idempotency.py</code>, but against the real <code>INSERT ... ON CONFLICT</code> SQL in <code>migrations/001_init.sql</code> instead of the in-memory double — worth running once to make sure the fake and the real thing actually agree.</p>
+  </section>
+
+  <section class="point" id="impl-checklist">
+    <h2><span class="num">6</span> Full end-to-end verification checklist</h2>
+    <p class="impl-note">Everything above in one sequence, if you want to convince yourself the whole thing actually works rather than take it on faith. Bash and PowerShell side by side — pick your shell and run top to bottom.</p>
+
+    <div class="step-block">
+      <h4>1. Run the unit tests (no Docker needed yet)</h4>
+      <div class="cmd-pair">
+        <div><div class="cmd-label">bash</div><pre><code>pytest -q</code></pre></div>
+        <div><div class="cmd-label">PowerShell</div><pre><code>pytest -q</code></pre></div>
+      </div>
+      <p class="expect">Expect <code>30 passed, 1 skipped</code>.</p>
+    </div>
+
+    <div class="step-block">
+      <h4>2. Start Postgres and confirm the schema loaded</h4>
+      <div class="cmd-pair">
+        <div><div class="cmd-label">bash</div><pre><code>docker compose up -d postgres
+docker compose logs postgres | grep "CREATE TABLE"</code></pre></div>
+        <div><div class="cmd-label">PowerShell</div><pre><code>docker compose up -d postgres
+docker compose logs postgres | Select-String "CREATE TABLE"</code></pre></div>
+      </div>
+      <p class="expect">Expect 13 <code>CREATE TABLE</code> lines.</p>
+    </div>
+
+    <div class="step-block">
+      <h4>3. Point the pipeline at that Postgres</h4>
+      <div class="cmd-pair">
+        <div><div class="cmd-label">bash</div><pre><code>export DATABASE_URL=postgresql://adpipeline:adpipeline@localhost:5433/adpipeline</code></pre></div>
+        <div><div class="cmd-label">PowerShell</div><pre><code>$env:DATABASE_URL = "postgresql://adpipeline:adpipeline@localhost:5433/adpipeline"</code></pre></div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <h4>4. Run the pipeline twice — row count must not change (idempotency)</h4>
+      <pre><code>python -m adpipeline.cli --start 2026-08-15 --end 2026-08-15 --today 2026-08-16
+python -m adpipeline.cli --start 2026-08-15 --end 2026-08-15 --today 2026-08-16</code></pre>
+      <p class="expect">Same command, either shell.</p>
+    </div>
+
+    <div class="step-block">
+      <h4>5. Check what actually landed</h4>
+      <pre><code>docker exec -it $(docker compose ps -q postgres) psql -U adpipeline -d adpipeline -c "SELECT customer_id, ad_account_id, reporting_day, spend_minor_reporting, reporting_currency, conversions, is_final FROM ads.fact_campaign_performance ORDER BY reporting_day;"</code></pre>
+      <p class="expect">Same command, either shell — <code>$(...)</code> works in both. Expect exactly 4 rows, <code>is_final = f</code>.</p>
+    </div>
+
+    <div class="step-block">
+      <h4>6. Advance "today" past the 30-day conversion-lag window — rows update in place, still no duplicates</h4>
+      <pre><code>python -m adpipeline.cli --start 2026-08-15 --end 2026-08-15 --today 2026-09-20
+docker exec -it $(docker compose ps -q postgres) psql -U adpipeline -d adpipeline -c "SELECT count(*) AS total_rows, sum(case when is_final then 1 else 0 end) AS final_rows FROM ads.fact_campaign_performance;"</code></pre>
+      <p class="expect">Same command, either shell. Expect <code>total_rows = 4, final_rows = 4</code>.</p>
+    </div>
+
+    <div class="step-block">
+      <h4>7. Run the live-Postgres integration test</h4>
+      <div class="cmd-pair">
+        <div><div class="cmd-label">bash</div><pre><code>pytest -q tests/test_idempotency_integration.py</code></pre></div>
+        <div><div class="cmd-label">PowerShell</div><pre><code>pytest -q tests/test_idempotency_integration.py</code></pre></div>
+      </div>
+      <p class="expect">Expect <code>1 passed</code> now that <code>DATABASE_URL</code> is set.</p>
+    </div>
+
+    <div class="step-block">
+      <h4>8. Tear down</h4>
+      <div class="cmd-pair">
+        <div><div class="cmd-label">bash</div><pre><code>docker compose down -v</code></pre></div>
+        <div><div class="cmd-label">PowerShell</div><pre><code>docker compose down -v</code></pre></div>
+      </div>
+    </div>
+
+    <p class="impl-note">If every step matches what's described, the pipeline, schema, and idempotency/reconciliation logic all work end-to-end.</p>
+  </section>
+
+  <section class="point" id="impl-assumptions">
+    <h2><span class="num">7</span> Assumptions I made for this take-home</h2>
+    <ul>
+      <li><strong>Google Ads is the platform I implemented.</strong> The design doc covers all three (Meta, Google Ads, TikTok); the base connector contract (<code>base_connector.py</code>) is written so adding Meta or TikTok later is a small addition, not a rewrite.</li>
+      <li><strong>The API is mocked</strong>, which the assignment explicitly allows — no real ad credentials spent. The fixture reproduces the quirks the assignment specifically asks about: pagination, rate-limit responses (with no retry-after hint, unlike Meta), and conversion-lag revisions. (<code>mock_google_ads_api.py</code>'s docstring spells out exactly what's simulated and how it differs from Meta.)</li>
+      <li><strong><code>dim_customer</code>/<code>dim_ad_account</code> are seeded from <code>config/customers.yaml</code></strong> instead of a real onboarding flow, which doesn't exist for this exercise. <code>cli.py</code>'s <code>_ensure_dims</code> upserts them idempotently on every run, so the whole demo is one command.</li>
+      <li><strong>FX rates are a small hardcoded table</strong> (<code>cli.py::_DEMO_FX_RATES</code>) rather than a real daily-close feed. The Design Document's currency section covers what the real source would be (openexchangerates.org or the ECB daily rates) and how <code>dim_fx_rate</code> would actually get populated in production.</li>
+      <li><strong>The conversion-lag window is fixed at 30 days</strong> (Google Ads' own default UI reporting window) instead of being configurable per platform or account — <code>pipeline.py</code>'s <code>MAX_ATTRIBUTION_WINDOW_DAYS</code> is the one constant to change if you want it shorter or longer.</li>
+      <li><strong>Google Ads doesn't give us a "this row is final" flag</strong> the way Meta's <code>date_stop_is_final</code> does — <code>GoogleAdsConnector</code> always defers to the pipeline, and finality ends up being purely a function of row age (<code>pipeline.py::_to_fact_row</code>). That's a genuine accuracy trade-off, not something skipped out of laziness — see the Design Document's data accuracy section for the reasoning.</li>
+      <li><strong>Reconciliation against the platform UI is designed, not built.</strong> I scoped it out to keep the 6–10 hour implementation window focused on the core extract → normalize → convert → upsert path and its tests — in the spirit of the assignment's own "thoughtful incompleteness beats rushed completeness."</li>
+      <li><strong><code>dags/google_ads_daily.py</code> is illustrative, not a tested production DAG.</strong> It's real Airflow TaskFlow/dynamic-task-mapping syntax calling the exact same <code>run_customer_extraction()</code> that <code>cli.py</code> uses, so it's not a second implementation of the pipeline — but it's never been run against an actual Airflow scheduler (that would need real Airflow Connections and Pools configured, out of scope for this exercise). Treat it as "here's what the DAG would look like," not "this DAG has been verified end to end."</li>
+    </ul>
+  </section>
+
+  <section class="point" id="impl-next">
+    <h2><span class="num">8</span> What I'd build next</h2>
+    <p>The Design Document's next-steps and ML-extension sections have the full list — the reconciliation job first, then Meta/TikTok connectors, hourly-grain extraction, cold-storage partition tiering, and the ML feature layer, roughly in that order of priority.</p>
+  </section>
+  </div>
+
+  <footer class="page-footer">
+    See <a class="file-link" href="DESIGN.md">DESIGN.md</a> for full technical depth on every section above, and <a class="file-link" href="README.md">README.md</a> for setup and run instructions.
+  </footer>
+
+</div>
+<script>
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+      document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      window.scrollTo(0, 0);
+    });
+  });
+</script>
+</body>
+</html>
